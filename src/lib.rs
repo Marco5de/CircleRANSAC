@@ -20,9 +20,13 @@ mod circle_ransac{
         pub hard_decision: bool,
         pub epsilon: f32,
     }
-
+    
     pub fn read_image(path: &str) -> ImageBuffer<Luma<u8>, Vec<u8>> {
         return open(path).unwrap().into_luma8();
+    }
+
+    pub fn edge_detection(img: &ImageBuffer<Luma<u8>, Vec<u8>>, edge_algorithm: &EdgeDetectionAlgorithm) -> ImageBuffer<Luma<u8>, Vec<u8>> {
+        canny(&img, edge_algorithm.lower_threshold, edge_algorithm.upper_thresold)
     }
 
     fn construct_model(pt1: (f32, f32), pt2: (f32, f32), pt3: (f32, f32)) -> Circle{
@@ -92,8 +96,6 @@ mod circle_ransac{
     ) -> Circle 
     {
         let edges = canny(&img, edge_algorithm.lower_threshold, edge_algorithm.upper_thresold);
-        // todo remove debug image 
-        edges.save("/tmp/edges.png").expect("Error saving edges image");
 
         // save edge coordinates into vector <-> size unknown start with 10 % of image pixel
         let mut edge_pts: Vec<(usize, usize)> = Vec::with_capacity((0.1 * (edges.height() * edges.width()) as f64).ceil() as usize);
@@ -114,7 +116,7 @@ mod circle_ransac{
             // draw random idxs from set
             let mut idxs: Vec<usize>;
             loop {
-                idxs = (0..3).map(|x| {
+                idxs = (0..3).map(|_| {
                     // todo read doc how inefficient this is..
                     rand::thread_rng().gen_range(0..num_edge_pts)
                 }).collect::<Vec<usize>>();
@@ -152,10 +154,20 @@ mod circle_ransac{
         use crate::circle_ransac::{Circle, ModelQualityAlgorithm, EdgeDetectionAlgorithm};
         use super::*;
 
+        static INPUT_PATH: &'static str = "res/image1.png";
+
         #[test]
         fn read_image_test() {
-            let gray = read_image("res/image1.png");
+            let gray = read_image(INPUT_PATH);
             let (h, w) = gray.dimensions();
+        }
+
+        #[test]
+        fn edge_detection_imwrite_test() {
+            let gray = read_image(INPUT_PATH);
+            let alg = EdgeDetectionAlgorithm{lower_threshold: 30., upper_thresold: 80.};
+            let edges = edge_detection(&gray, &alg);
+            edges.save("/tmp/edges.png").expect("Imwrite failed");
         }
 
         #[test]
@@ -224,7 +236,7 @@ mod circle_ransac{
 
         #[test]
         fn circle_ransac_test() {
-            let gray = read_image("res/image1.png");
+            let gray = read_image(INPUT_PATH);
             let support_alg = ModelQualityAlgorithm{threshold: 0.2, hard_decision: true, epsilon: 0.0};
             let edge_alg = EdgeDetectionAlgorithm{lower_threshold: 15., upper_thresold: 45.};
             let pmax = 0.01;
